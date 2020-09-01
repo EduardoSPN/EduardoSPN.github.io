@@ -25,6 +25,8 @@ library(purrr)
 library(tidyquant)
 library(ggpubr)
 
+library(vroom)
+library(kableExtra)
 
 library(dygraphs)
 library(xts)          # To make the convertion data-frame / xts format
@@ -42,19 +44,19 @@ library(magick)
 
   1. Assets, periods and relevant economic events (plot daily SP just to show volatility in march)
   
-  2. Descriptive stats and distribution
+  2. Data handling and cleaning
   
-  3. Realized Volatility and co-Movements between assets
+  3. Descriptive stats and distribution
   
-  5. Signature Plot
+  4. Realized Volatility and co-Movements between assets
   
-  6. Main takeaways
+  6. Signature Plot
+  
+  7. Main takeaways
   
 ---
 
 ### 1) Assets, periods and economic events
-
-<br>
 
 .pull-left[
 Asset        |    Sector
@@ -76,11 +78,7 @@ Period         |   Relevant Events
 8/27/2020      |    J. Powell Speech
 ]
 
----
-
-### S&P 500 returns around the relevant dates
-
-```{r echo=FALSE}
+```{r echo=FALSE, results='hide'}
 
 getSymbols(Symbols = 'SPY', from = "2019-07-01", src = 'yahoo')
 
@@ -92,9 +90,10 @@ spy_ret <- periodReturn(SPY$SPY.Close,
              )
 
 ```
+<br>
+```{r echo=FALSE, fig.height=3.8, fig.width=7.8, fig.align='center'}
 
-```{r echo=FALSE, fig.height=5.5, fig.width=8.5, fig.align='center'}
-a <- dygraph(spy_ret) %>% 
+a <- dygraph(spy_ret, main = "SPY daily returns (SP500_ETF)") %>% 
   dyOptions(strokeWidth = 1, colors = "blue") %>% 
   dyRangeSelector() %>% 
   dyShading(from = "2019-9-5", to = "2019-9-25", color = "lightgray") %>% 
@@ -102,4 +101,49 @@ a <- dygraph(spy_ret) %>%
   dyShading(from = "2020-8-19", to = "2020-8-31", color = "lightgray")
 a
 ```
+
+---
+
+### 2) Data Handling and Cleaning
+
+* Brownlees et al. (2006): Use the 'trade_correction_indicator' and 'sale_conditions' to exclude incorrectly reported data.
+
+(...)
+---
+
+### SPY - All the Exchanges
+
+.middle.center[
+
+<img src="spy_multi_exchange.png" height="500px">
+
+]
+
+---
+
+### SPY - only NYSE
+
+.middle.center[
+
+<img src="spy_nyse.png" height="500px">
+
+]
+
+---
+
+### SPY
+
+```{r echo=FALSE, eval=FALSE}
+
+spy_small_2 <- vroom('spy_m_2.csv') %>% as.data.table()
+
+a <- dygraph(spy_small_2$price, main = "SPY levels") %>% 
+  dyOptions(strokeWidth = 1, colors = "black") %>% 
+  dyRangeSelector() %>% 
+  dyShading(from = "2020-3-1", to = "2020-3-25", color = "lightgray") %>% 
+  dyShading(from = "2020-8-19", to = "2020-8-31", color = "lightgray")
+a
+
+```
+
 
