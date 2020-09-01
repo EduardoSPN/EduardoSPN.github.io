@@ -1,0 +1,105 @@
+---
+title: "Realized Volatility"
+author: "Yijin Wang, Eduardo Schiappa-Pietra and Jiamiao Xu"
+date: "8/31/2020"
+output:
+  xaringan::moon_reader:
+    css: "slides.css"
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = TRUE,
+                      comment = "#>")
+```
+
+```{r packages, echo=FALSE}
+
+library(knitr)
+library(tidyverse)
+library(purrr)
+library(tidyquant)
+library(ggpubr)
+
+
+library(dygraphs)
+library(xts)          # To make the convertion data-frame / xts format
+library(lubridate)
+library(htmltools)
+library(astsa)
+library(TTR)
+library(quantmod)
+
+library(kableExtra)
+library(magick)
+```
+
+### Outline
+
+  1. Assets, periods and relevant economic events (plot daily SP just to show volatility in march)
+  
+  2. Descriptive stats and distribution
+  
+  3. Realized Volatility and co-Movements between assets
+  
+  5. Signature Plot
+  
+  6. Main takeaways
+  
+---
+
+### 1) Assets, periods and economic events
+
+<br>
+
+.pull-left[
+Asset        |    Sector
+-------------| -------------
+SPY          |    SPDR S&P 500 ETF
+XLF          |    Financial
+XLK          |    Technology 
+GLD          |    Gold 
+UUP          |    US Dollar 
+]
+
+.pull-right[
+Period         |   Relevant Events
+---------------|--------------
+09/16/2019     |    Repo Mkt. Crisis
+03/09/2020     |    SP500 down -7.6%
+03/12/2020     |    SP500 down -9.5%  
+03/17/2020     |    SP500 down -12% 
+8/27/2020      |    J. Powell Speech
+]
+
+---
+
+### S&P 500 returns around the relevant dates
+
+```{r echo=FALSE}
+
+getSymbols(Symbols = 'SPY', from = "2019-07-01", src = 'yahoo')
+
+spy_ret <- periodReturn(SPY$SPY.Close,
+             period='daily',
+             subset=NULL,
+             type='log',
+             leading=TRUE,
+             )
+
+```
+
+```{r echo=FALSE, fig.height=5.5, fig.width=8.5, fig.align='center'}
+a <- dygraph(spy_ret) %>% 
+  dyOptions(strokeWidth = 1, colors = "blue") %>% 
+  dyRangeSelector() %>% 
+  dyShading(from = "2019-9-5", to = "2019-9-25", color = "lightgray") %>% 
+  dyShading(from = "2020-3-1", to = "2020-3-25", color = "lightgray") %>% 
+  dyShading(from = "2020-8-19", to = "2020-8-31", color = "lightgray")
+a
+```
+
