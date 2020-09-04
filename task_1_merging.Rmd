@@ -1,0 +1,347 @@
+---
+title: "Trading Up"
+subtitle: "Task 1 - Merging"
+author: "Eduardo Schiappa-Pietra"
+date: "8/22/2020"
+output:
+  xaringan::moon_reader:
+    css: "slides.css"
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+class: inverse, center, middle
+# Reading in and subsetting infoUSA
+### See Previous report
+---
+class: inverse, center, middle
+# Reading in and subsetting Corelogic data 
+## SQL Query
+---
+
+### Reading in and subsetting the data
+
+**Load Packages**
+```{r eval=FALSE}
+
+rm(list = ls())
+
+library(tidyverse)
+library(purrr)
+library(furrr)
+library(R.utils)
+
+library(data.table)
+library(R.utils) #Required for fread() to read compressed files
+library(vroom)
+library(parallel)
+library(multidplyr)
+
+
+library(dtplyr)
+library(feather)
+library(rlist)
+
+#To work with SQL tables
+library(RODBC)
+library(odbc)
+library(DBI)
+library(sqldf)
+library(RSQLite)
+library(dbplyr)
+
+#Set as WD wherever this Rscript is stored in
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+getwd()
+
+```
+---
+### Reading in and subsetting the Corelogic data
+
+We inspect the var names of the dataset and we read in a small sample of infoUSA (for an initial merge)
+```{r eval=FALSE}
+
+###########################
+##### INITIAL STUFF #######
+###########################
+
+# Inspect variable names in Corelogic
+core_logic_mtg_vars <- read.csv(file = "//oit-nas-fe11.oit.duke.edu/corelogic/data/raw/UniversityofPA_DeedWithMtgs_AKZA_6KPKSN_12.txt", 
+                                header = TRUE, sep = "|", nrows = 2) %>% colnames() %>% tolower() %>% str_sort()
+
+#Small dataset - One zip_code and one year for initial merging
+infousa_nc_small <- fread("data/infousa_NC_small.txt")
+
+#InfoUSA var_names
+infousa_small_vars <- colnames(infousa_nc_small)
+```
+---
+### Reading in and subsetting the Corelogic data
+
+Set up the ODBC connection to the SQL database (finally on the VM) and run query. We extract only the first 5 digits of the zip, me format the date variables
+and filter only resale transactions, owner occupied status and NC.
+```{r eval=FALSE}
+
+###########################################
+##### READ IN CORELOGIC DATA  - SQL #######
+###########################################
+
+# Check Drivers and pick relevant one
+unique(odbcListDrivers())
+
+# Set up connection to ODBC and SQL data base
+con_2 <- dbConnect(odbc(),
+                   Driver = "MySQL ODBC 8.0 Unicode Driver",
+                   Server = "corelogic-sql.ssri.duke.edu",
+                   Database = "corelogic_flat",
+                   UID = "corelogic",
+                   PWD = "said-aplomb 8%[hypo] pucker[seem]")
+
+
+# Query (I guess we could parallelize this
+time_query <- system.time({
+  cor_sql_nc <- dbGetQuery(con_2,
+                             "SELECT fips AS fips_c, apn_unformatted AS apn_unformatted_c, pcl_id_iris_frmtd AS pcl_id_iris_frmtd_c, 
+                             apn_sequence_number AS apn_sequence_number_c, pending_record_indicator AS pending_record_indicator_c, 
+                             corporate_indicator AS corporate_indicator_c, owner_1_last_name AS last_name_1_c, owner_1_first_name_and_mi AS first_name_1_c,
+                             owner_2_last_name AS last_name_2_c, owner_2_first_name_and_mi AS first_name_2_c,
+                             owner_etal_indicator AS owner_etal_indicator_c, owner_relationship_type AS owner_relationship_type_c, 
+                             situs_house_number_prefix AS house_number_prefix_c, situs_house_number_suffix AS house_number_suffix_c,
+                             situs_house_number AS house_number_c, situs_street_direction AS street_direction_c, situs_street_name AS street_name_c, 
+                             situs_mode AS mode_c, situs_quadrant AS quadrant_c, situs_apartment_unit AS unit_number_c,
+                             situs_city AS city_c, situs_state AS state_c, 
+                             
+                             LEFT(situs_zip_code, 5) AS zip_c, FORMAT(sale_date, 'yyyyMMdd') AS sale_date_c,
+                             FORMAT(recording_date, 'yyyyMMdd') AS recording_date_c, 
+                             
+                             transaction_type AS transaction_type_c,
+                             absentee_owner_status AS absentee_owner_status_c
+                             
+                             FROM deeds_with_mortgages
+                             
+                             WHERE situs_state = 'NC'
+                             AND transaction_type = 1
+                             AND absentee_owner_status='S';"
+  )
+  
+})
+
+
+# Close connection
+dbDisconnect(con)
+
+fwrite(cor_sql_nc, "data/corelogic_NC_sql.txt")
+
+```
+---
+
+### Reading in and subsetting the Corelogic data
+
+```{r eval=FALSE}
+
+#####################
+##### INSPECT #######
+#####################
+
+#Read in data
+core_nc <- fread("data/corelogic_NC_sql.txt")
+
+#Inspect
+class(core_nc)
+colnames(core_nc)
+
+#Convert into DT
+core_nc <- as.data.table(core_nc)
+
+#Check var types
+core_nc %>% map(class)
+
+#Check dates
+head(core_nc$sale_date_c, 50)
+tail(core_nc$sale_date_c, 50)
+
+
+```
+---
+class: inverse, center, middle
+# Merging InfoUSA and Corelogic
+---
+
+### Merging
+
+The different var names between the datasets will be useful for the SQL Inner Join. To merge in R using data tables we actually need the same names of the key variables.
+
+Here are the number of observations for each data set. Makes sense?
+
+
+Dataset           |    Numb of Obs        Numb of Vars
+------------------|-----------------|-----------------
+InfoUSA           |    27,121,986   |63
+Corelogic         |    1,991,222    |27
+Corelogic w/ corp |    1,941,339    |27  
+
+---
+### Merging
+
+Read in Data
+```{r eval=FALSE}
+
+###############################################
+##### READ IN INFOUSA AND CORELOGIC DATA ######
+###############################################
+
+# InfoUSA
+time_fread_infousa_parallel <- system.time({
+  cores <- detectCores()
+  c1 <- makeCluster(cores)
+  clusterEvalQ(c1, library(data.table))
+  
+  infousa_nc <- fread("data/infousa_NC.txt")
+  
+  stopCluster(c1)
+})
+
+head(infousa_nc, 10)
+class(infousa_nc)
+
+#InfoUSA - Small
+infousa_nc_small <- vroom("data/infousa_NC_small.csv")
+
+#Corelogic
+core_nc <- fread("data/corelogic_NC_sql.txt")
+
+#Corelogic  - Small
+core_nc_small <- vroom("data/corelogic_NC_small.csv")
+
+
+```
+
+---
+### Merging
+
+Trying SQL Join - Not enough memory
+```{r eval=FALSE}
+########################
+##### MERGE - SQL ######
+########################
+
+### Not enough memory (even in the VM) ###
+
+# Create a new in-memory SQL database with the data from NC and use SQL functions to merge
+con_local <- dbConnect(RSQLite::SQLite(), dbname = ":memory:")
+copy_to(con_local, infousa_nc, "infousa_nc_small")
+copy_to(con_local, core_nc, "core_nc_small")
+dbListTables(con_local)
+
+
+# # Merge 1- SQL
+# time_merge_sql <- system.time({
+#   merge_1 <- dbGetQuery(con_local,
+#                         "SELECT *
+#                             FROM core_nc_small
+#                             INNER JOIN infousa_nc_small
+#                             ON last_name_1=owner_1_last_name
+#                             AND first_name_1 = owner_1_first_name_and_mi
+#                             AND zip = situs_zip_code
+#                             AND house_num = situs_house_number
+#                             AND street_name = situs_street_name;")
+# })
+# 
+# dbDisconnect(con_local)
+```
+
+---
+### Merging
+
+We try a regular data table merge. Works but I get a warning that I'm about to run out of memory. 
+First we need some adjustments
+
+```{r eval=FALSE}
+########################
+##### MERGE - DT #######
+########################
+
+### Come adjustments first ####
+
+# Check col names
+colnames(core_nc)
+colnames(infousa_nc)
+
+# Index for the columns which names need to change
+change_index <-  match(c("first_name_1", "last_name_1", "ZIP", "STREET_NAME", "HOUSE_NUM"), colnames(infousa_nc))
+
+# Change var names for the merge in InfoUSA
+colnames(infousa_nc)[change_index] <- c("first_name_1_c", "last_name_1_c", "zip_c", "street_name_c", "house_number_c")
+
+# We also need the same variable types
+class(infousa_nc$first_name_1_c)
+class(core_nc$first_name_1_c)
+
+class(infousa_nc$last_name_1_c)
+class(core_nc$last_name_1_c)
+
+class(infousa_nc$zip_c)
+class(core_nc$zip_c)
+
+class(infousa_nc$street_name_c)
+class(core_nc$street_name_c)  
+
+class(infousa_nc$house_number_c)
+class(core_nc$house_number_c)  
+
+# We need to put house_number_c as character in corelogic
+core_nc[,house_number_c := as.character(house_number_c )]
+
+# Now lets create a temporary ID in Corelogic to keep track of the merges
+core_nc$temp_id <- seq(nrow(core_nc))
+
+```
+
+---
+### Merging
+
+A first merge attempt. Need to inspect variables in detail to find inconsistencies and try to make homogeneous. For instance: different lenght of characters in 'house_number"
+
+```{r eval=FALSE}
+##### 1st MERGE #######
+
+# Merge by: Owner first name,  Owner last name, zipcode, address name and address number
+attempt_1 <- merge(core_nc, infousa_nc, by = c("first_name_1_c", "last_name_1_c", "zip_c", "street_name_c", "house_number_c"))
+
+colnames(attempt_1)
+head(attempt_1)
+
+#attempt <- attempt[-which(duplicated(attempt$X)),] 
+
+paste('percentage merged:', 100*(length(unique(attempt_1$temp_id))/length(unique(core_nc$temp_id))))
+
+# Get rid of corporate owners
+core_nc_2 <- core_nc[- which(corporate_indicator_c == 'Y')]
+
+##### 2nd MERGE #######
+
+# iterate!
+```
+
+---
+
+class: inverse, center, middle
+# TO DO
+---
+
+* Check key variables in merge and try to harmonize them between the two datasets. For example, the variable "house_number" has three digits in InfoUSA and 4 in Corelogic. Maybe we are looking for house_number_prefix or suffix?
+
+* Check for duplicates. Maybe create an additional ID to index the combined data
+
+* Try different iterations for the merging and replicate Sarah's matching approach.
+
+* Strategy to clean complicated character variables like addresses
+
+* Look for inconsistencies for further cleaning
