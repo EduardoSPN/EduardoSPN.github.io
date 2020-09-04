@@ -105,6 +105,12 @@ con_2 <- dbConnect(odbc(),
                    PWD = "said-aplomb 8%[hypo] pucker[seem]")
 
 
+```
+
+---
+### Reading in and subsetting the Corelogic data
+
+```{r eval=FALSE}
 # Query (I guess we could parallelize this
 time_query <- system.time({
   cor_sql_nc <- dbGetQuery(con_2,
@@ -137,9 +143,11 @@ time_query <- system.time({
 # Close connection
 dbDisconnect(con)
 
+#Save the file
 fwrite(cor_sql_nc, "data/corelogic_NC_sql.txt")
-
 ```
+
+
 ---
 
 ### Reading in and subsetting the Corelogic data
@@ -267,8 +275,7 @@ First we need some adjustments
 ########################
 ##### MERGE - DT #######
 ########################
-
-### Come adjustments first ####
+### Some adjustments first ####
 
 # Check col names
 colnames(core_nc)
@@ -283,24 +290,14 @@ colnames(infousa_nc)[change_index] <- c("first_name_1_c", "last_name_1_c", "zip_
 # We also need the same variable types
 class(infousa_nc$first_name_1_c)
 class(core_nc$first_name_1_c)
-
 class(infousa_nc$last_name_1_c)
 class(core_nc$last_name_1_c)
-
 class(infousa_nc$zip_c)
 class(core_nc$zip_c)
-
 class(infousa_nc$street_name_c)
 class(core_nc$street_name_c)  
-
 class(infousa_nc$house_number_c)
 class(core_nc$house_number_c)  
-
-# We need to put house_number_c as character in corelogic
-core_nc[,house_number_c := as.character(house_number_c )]
-
-# Now lets create a temporary ID in Corelogic to keep track of the merges
-core_nc$temp_id <- seq(nrow(core_nc))
 
 ```
 
@@ -311,6 +308,13 @@ A first merge attempt. Need to inspect variables in detail to find inconsistenci
 
 ```{r eval=FALSE}
 ##### 1st MERGE #######
+
+# We need to put house_number_c as character in corelogic
+core_nc[,house_number_c := as.character(house_number_c )]
+
+# Now lets create a temporary ID in Corelogic to keep track of the merges
+core_nc$temp_id <- seq(nrow(core_nc))
+
 
 # Merge by: Owner first name,  Owner last name, zipcode, address name and address number
 attempt_1 <- merge(core_nc, infousa_nc, by = c("first_name_1_c", "last_name_1_c", "zip_c", "street_name_c", "house_number_c"))
@@ -336,6 +340,8 @@ class: inverse, center, middle
 # TO DO
 ---
 
+### To Do
+
 * Check key variables in merge and try to harmonize them between the two datasets. For example, the variable "house_number" has three digits in InfoUSA and 4 in Corelogic. Maybe we are looking for house_number_prefix or suffix?
 
 * Check for duplicates. Maybe create an additional ID to index the combined data
@@ -345,3 +351,5 @@ class: inverse, center, middle
 * Strategy to clean complicated character variables like addresses
 
 * Look for inconsistencies for further cleaning
+
+
