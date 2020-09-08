@@ -1,0 +1,580 @@
+---
+title: "HW1 Question 3 - Machine Learning"
+author: "Eduardo Schiappa Pietra Nieto"
+date: ""
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages, include=FALSE, echo=FALSE}
+rm(list = ls())
+
+library(rpart)
+library(rpart.plot)
+library(caret)
+library(ranger)
+library(e1071)
+library(randomForest)
+library(inTrees)
+
+library(tidyverse)
+library(kableExtra)
+library(purrr)
+library(pROC)
+
+library(formattable)
+library(rattle)
+
+library(imbalance)
+
+#Set as WD wherever this Rscript is stored in
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+getwd()
+```
+
+
+<style type="text/css">
+
+body, td {
+   font-size: 18px;
+}
+code.r{
+  font-size: 12px;
+}
+pre {
+  font-size: 12px
+}
+</style>
+
+<br>
+
+# Question 3.1
+## Part A
+
+<br>
+
+### Adequacy of Predictors for splitting (Just an initial look before answering the question)
+<br>
+
+We see the attributes and check their distribution between the labels
+```{r echo = FALSE}
+# Read in Data 
+train <- read.csv("data_train.csv") %>% as.data.frame()
+test <- read.csv("data_train.csv") %>% as.data.frame()
+
+# Inspect Data
+table(train$diagnosis)
+hist(train$diagnosis, main = "count of 'diagnosis' classes")
+
+colnames(train)[1] <- "y_train"
+colnames(test)[1] <- "y_test"
+
+train$y_train <- train$y_train %>% as.factor()
+test$y_test <- test$y_test %>% as.factor()
+
+
+```
+
+Here we show the distribution of each attribute between the two labels of the target variable. This gives us initial insight about which are the best attributes (We want those wich have a more "uneven" distribution).
+```{r echo = FALSE, fig.width=9, fig.height=11, fig.align='center'}
+# Check how predictors relate to target variable ?????
+featurePlot(x = train[,2:ncol(train)], 
+            y = train$y_train, 
+            strip=strip.custom(par.strip.text=list(cex=.7)),
+            plot = 'box',
+            scales = list(x=list(relation="free"),
+                          y=list(relation="free")))
+```
+
+
+```{r echo=FALSE, include=FALSE}
+##################################################
+###### Adequacy of predictors for splitting ######
+##################################################
+
+table(train$y_train, train$radius_mean)!=0
+
+# Create tables to see how the numb of observ. for each predictor splits into the target labels
+number.perfect.splits <- apply(X=train[-1], MARGIN = 2, FUN = function(i){
+  t <- table(train$y_train, i)
+  sum(t == 0) # We are counting the instances where we have all the predictors' observations in either one of the labels 0 or 1
+})
+
+# It might be the case that some predictors' observations correspond to both 1 and 0 labels. In those cases, we don't have a 'perfect split' or 'pure node'. 
+# We are only counting 'pure' cases.
+
+# We put the perfect splits in descending order
+order <- order(number.perfect.splits,decreasing = TRUE)
+number.perfect.splits <- number.perfect.splits[order]
+
+# All predictors seem to be important
+```
+
+
+Here we are plotting in descending order the number of perfect splits for each attribute. The first attributes in the horizontal axis have more perfect splits which is good for prediction (and also for avoiding overfitting).
+```{r echo=FALSE, fig.width=9, fig.height=7, fig.align='center'}
+# Plot graph
+par(mar=c(10,2,2,2))
+barplot(number.perfect.splits,
+        main="Number of perfect splits vs feature",
+        xlab="",ylab="Feature",las=2, col="light blue")
+```
+
+
+# Now we estimate the trees: ID3, C4.5 and Random Forest
+<br>
+
+## 1. ID3
+
+This is the results of the ID3 model (We use the algorithm for CART but change the split criteria to Information Gain)
+'CP' is the complexity parameter or 'regularizer' (lambda) and accuracy is the number of correct predictions over total number of prediction
+
+```{r echo=FALSE, warning=FALSE}
+# Set the seed for reproducibility
+set.seed(100)
+
+# This is for cross validation and other stuff USE LATER
+trctrl <- trainControl(method = "cv", number = 5)
+```
+
+```{r echo = FALSE, warning=FALSE}
+################
+###### ID3 ######
+#################
+
+# Train model (we use method 'class' for ID3)
+# For ID3, the 'caret' package uses method = 'rpart' which corresponds to CART but specifying that we want Information Gain as Splitting Criteria
+
+id3_time <- system.time({ # This is for time cost performance
+  
+id3 <- train(y_train ~ ., 
+             data = train, 
+             method = "rpart",
+             metric='Accuracy',
+             trControl = trctrl,
+             parms = list(split = "information"))
+})
+
+# See results
+id3
+
+# Check out predictions of model
+id3_fit <- predict(id3)
+
+# cp is the complexity parameter (regulatizer) --> The C in question 2,3 --> penalizes the number of splits
+
+# Kappa or Cohen’s Kappa is like classification accuracy, except that it is normalized at the baseline of random chance on your dataset. It is a more useful measure to use on problems that have an imbalance in the classes (e.g. 70-30 split for classes 0 and 1 and you can achieve 70% accuracy by predicting all instances are for class 0). Learn more about Kappa here.
+```
+Here we show a plot of the tree for ID3. Each node shows the % of observations in each label and the proportion of the total observations that falls in that node. It also shows the cutoff points for the attributes.
+```{r echo = FALSE, fig.width=9, fig.height=11, fig.align='center'}
+# PLot Tree
+fancyRpartPlot(id3$finalModel,palettes="RdPu")
+
+```
+
+Next we show several indicators of classification such as sensitivity and specificity
+```{r, echo=FALSE}
+# Accuracy - We evaluate using the test data
+id3_test_pred <- predict(id3, newdata = test)
+con_mat_id3 <- confusionMatrix(id3_test_pred, test$y_test)
+con_mat_id3
+```
+
+Here we have the confusion matrix
+```{r}
+con_mat_id3$table
+```
+
+
+## 2. CART
+
+Results of the model
+```{r echo = FALSE, warning=FALSE}
+##################
+###### CART ######
+##################
+
+# We only need to change the spliting method to 'gini'
+
+cart_time <- system.time({    # This is for time cost performance
+  
+  cart <- train(y_train ~ ., 
+               data = train, 
+               method = "rpart",
+               metric='Accuracy',
+               trControl = trctrl,
+               parms = list(split = "gini"))
+})
+
+# See results
+cart
+
+# Check out predictions of model
+cart_fit <- predict(cart)
+
+```
+
+Plot
+```{r echo = FALSE, warning=FALSE, fig.width=9, fig.height=11, fig.align='center'}
+# PLot Tree
+fancyRpartPlot(cart$finalModel,palettes="RdPu")
+```
+
+Confusion Matrix
+```{r echo = FALSE, warning=FALSE}
+# Accuracy - We evaluate using the test data
+cart_test_pred <- predict(cart, newdata = test)
+con_mat_cart <- confusionMatrix(cart_test_pred, test$y_test )
+con_mat_cart$table
+```
+
+<br>
+
+## 3. Random Forest
+
+Results of the model
+```{r echo = FALSE, warning=FALSE, include=FALSE}
+
+rf_time <- system.time({    # This is for time cost performance
+
+  rf <- train(y_train~., 
+              data=train, 
+              method='rfRules', 
+              metric='Accuracy',
+              ntree=50,
+              trControl=trctrl,
+              parms = list(split = "gini"))
+})
+
+```
+
+
+```{r echo = FALSE, warning=FALSE}
+# See results
+rf
+```
+
+Confusion Matrix
+```{r echo = FALSE, warning=FALSE}
+rf_test_pred <- predict(rf, newdata = test)
+con_mat_rf <- confusionMatrix(rf_test_pred, test$y_test )
+con_mat_rf$tab
+```
+
+***
+<br>
+
+# Question 3.1
+## Part B
+
+All this is part of the procedure we did in A.
+<br>
+  1. We divide the training data into 5 folds. We use 4 of them to train the model.
+  
+  <br>
+  
+  2. We then evaluate the accuracy using the hold-out fold as a 'test' set. We do this until every fold has been used as a hold-out.
+  
+  <br>
+  
+  3. We follow this procedure for all the range of possible candidates (1 to 10) for the maximum depth hyperparameter.
+  
+  <br>
+  
+  4. For each iteration we get the Accuracy measure (for each hold-out and each value of the hyperparameter.
+  
+  <br>
+  
+  5. We then average those results across all the hold-out iterations and hence get one average value of Accuracy for each hyperparameter possibility.
+  
+  <br>
+  
+  6. We choose the hyperparameter value that has the highest average accuracy. <b>In this case we choose a value of 4 which corresponds to the highest accuracy.</b>
+
+<br>
+
+Here we show the results. First the indicators and then the confusion matrix
+```{r echo=FALSE, warning=FALSE}
+rf
+con_mat_rf$overall
+con_mat_rf$byClass
+```
+
+Confusion Matrix
+
+```{r}
+con_mat_rf$table
+
+```
+
+***
+<br>
+
+# Question 3.1
+## Part C
+
+```{r echo = FALSE, warning=FALSE, message=FALSE, include=FALSE}
+trn <- read.csv("data_train.csv")
+tst <- read.csv("data_test.csv")
+
+full <- rbind(trn, tst)
+
+# ROC
+roc_group <- apply(full, 2, function(i){
+  roc(full$diagnosis, i, percent = TRUE, auc = TRUE, ci=TRUE)
+})
+
+
+```
+
+
+We plot the ROC curves for each feature (one by one and then all of them in one graph)
+
+```{r echo = FALSE, warning=FALSE, fig.width=9, fig.height=11, fig.align='center', message=FALSE, results='hide'}
+lapply(seq(roc_group), function(i){
+  plot(x = roc_group[[i]], type = "shape", ci=TRUE, ci.type="shape", of = "se", print.auc = TRUE, percent =TRUE, main = paste0('ROC_', names(roc_group)[i]))
+})
+```
+
+Now all the curves in the same graph
+
+```{r echo = FALSE, warning=FALSE, fig.width=9, fig.height=11, fig.align='center', message=FALSE, results='hide'}
+
+ for (i in seq(roc_group[2:length(roc_group)])){
+   plot(roc_group[[i]], col=i+2, add=(i!=1))   
+ }
+
+```
+
+
+AUC indicator for each attribute (descending order)
+
+<br>
+
+```{r echo = FALSE, warning=FALSE, fig.width=9, fig.height=11, fig.align='center', message=FALSE}
+# AUC
+auc_group <- lapply(roc_group, function(i){
+  auc(i)
+})
+
+auc_group_df <- auc_group %>% as.data.frame() %>% t() %>% as.data.frame()
+
+auc_group_df$attribute <- rownames(auc_group_df)
+
+auc_group_df<- auc_group_df[,c(2,1)] 
+
+rownames(auc_group_df) <- NULL
+
+colnames(auc_group_df) <- c("Attribute", "AUC_(%)")
+
+auc_group_df <- auc_group_df[order(auc_group_df$`AUC_(%)`, decreasing = TRUE),]
+auc_group_df <- auc_group_df[-1,]
+rownames(auc_group_df) <- NULL
+
+auc_table <- formattable(auc_group_df, 
+            align =c("l","c"))
+auc_table
+
+
+```
+The features that show a higher AUC are more useful in predicting the labels since AUC is a measure of how well that single feature manages the trade-off between True Positives and False Positives.
+
+***
+<br>
+
+# Question 3.1
+## Part D
+
+<br>
+
+<b> Important Notes </b> :
+
+* The horisontal axis of the ROC curve computed here is the "specificity" which is 1 - False Positive Rate.
+* In the question of the hoework (3.1 - d), I understand that the range 0 - 0.2 is for the FPR so I am computing
+* The Partial AUC for the range 0.8 - 1 of the Specificity.
+
+```{r echo = FALSE, warning=FALSE, fig.width=9, fig.height=11, fig.align='center', message=FALSE}
+#Lets get first 5 features (according to AUC):
+first_five <- auc_group_df[1:5,][1] %>% unlist()
+
+# partial AUC for first 5 attributes
+auc_group_part <- lapply(roc_group[first_five], function(i){
+  auc(i, partial.auc = c(100, 80), partial.auc.focus="sp")
+})
+
+auc_group_part_df <- auc_group_part %>% as.data.frame() %>% t() %>% as.data.frame()
+
+auc_group_part_df$attribute <- rownames(auc_group_part_df)
+
+auc_group_part_df<- auc_group_part_df[,c(2,1)] 
+
+rownames(auc_group_part_df) <- NULL
+
+colnames(auc_group_part_df) <- c("Attribute", "PAUC_(%)")
+
+auc_group_part_df <- auc_group_part_df[order(auc_group_part_df$`PAUC_(%)`, decreasing = TRUE),]
+rownames(auc_group_part_df) <- NULL
+
+auc_part_table <- formattable(auc_group_part_df, 
+                         align =c("l","c"))
+
+```
+
+# Question 3.1
+## Part E
+
+ * For this part we use the function `varImp()` in R.
+ * This function randomly scrambles each variable and then calculates the mean of the (scaled) class-specific decreases in accuracy and reports it for each of the classes. This way we have a measure of the importance of each attribute.
+ 
+```{r}
+varImp(cart)
+```
+
+
+# Question 3.2
+## Part A
+
+```{r echo = FALSE, warning=FALSE, fig.width=9, fig.height=11, fig.align='center', message=FALSE}
+##########################################################################
+############################### PART A ###################################
+##########################################################################
+
+#Read in Data
+
+train_imb <- read.csv("data_imbalanced_train.csv")
+test_imb <- read.csv("data_imbalanced_test.csv")
+
+colnames(train_imb)[1] <- "y_train_imb"
+colnames(test_imb)[1] <- "y_test_imb"
+
+train_imb$y_train_imb <- train_imb$y_train_imb %>% as.factor()
+test_imb$y_test_imb <- test_imb$y_test_imb %>% as.factor()
+```
+
+
+We compute the imbalance ratio as
+
+$$IR = \frac{N_{majority}}{N_{minority}}$$
+
+```{r}
+# Imbalance ratio --> N_majority/N_minority = -0.1793
+imb_ratio <- imbalanceRatio(train_imb, classAttr = "y_train_imb")
+imb_ratio
+```
+
+# Question 3.2
+## Part B
+
+We create the model weights as the inverse of the number of observations in each label in order to favor the less frequent labels in the model.
+```{r echo = FALSE, warning=FALSE, fig.width=9, fig.height=11, fig.align='center', message=FALSE}
+##########################################################################
+############################### PART B ###################################
+##########################################################################
+
+# Create model weights as the inverse of the number of observatiobs in each label
+model_weights <- ifelse(train_imb$y_train_imb == 0,
+                        (1/table(train_imb$y_train_imb)[1]) * 0.5,
+                        (1/table(train_imb$y_train_imb)[2]) * 0.5)
+
+train_imb$y_train_imb <- train_imb$y_train_imb %>% as.factor()
+test_imb$y_test_imb <- test_imb$y_test_imb %>% as.factor()
+
+trctrl <- trainControl(method = "cv", number = 5)
+```
+## ID3 Model
+```{r echo = FALSE, warning=FALSE, fig.width=9, fig.height=11, fig.align='center', message=FALSE}
+#################
+###### ID3 ######
+#################
+
+# Train model (we use method 'class' for ID3)
+# For ID3, the 'caret' package uses method = 'rpart' which corresponds to CART but specifying that we want Information Gain as Splitting Criteria
+  
+  id3_imb <- train(y_train_imb ~ ., 
+               data = train_imb, 
+               method = "rpart",
+               metric='Accuracy',
+               weights = model_weights,
+               trControl = trctrl,
+               parms = list(split = "information"))
+
+```
+
+Results
+```{r echo = FALSE, warning=FALSE, fig.width=9, fig.height=11, fig.align='center', message=FALSE}
+# See results
+id3_imb
+
+# Accuracy and Confusion Matrix
+id3_imb_test_pred <- predict(id3_imb, newdata = test_imb)
+con_mat_id3_imb <- confusionMatrix(id3_imb_test_pred, test_imb$y_test_imb)
+```
+
+
+Confusion Matrix
+```{r echo=FALSE}
+con_mat_id3_imb$table
+```
+
+
+## CART Model
+
+```{r echo = FALSE, warning=FALSE, fig.width=9, fig.height=11, fig.align='center', message=FALSE}
+##################
+###### CART ######
+##################
+
+# We only need to change the spliting method to 'gini'
+  
+  cart_imb <- train(y_train_imb ~ ., 
+                        data = train_imb, 
+                        method = "rpart",
+                        metric='Accuracy',
+                        weights = model_weights,
+                        trControl = trctrl,
+                        parms = list(split = "gini"))
+
+# See results
+cart_imb
+
+# Accuracy and Confusion Matrix
+cart_imb_test_pred <- predict(cart_imb, newdata = test_imb)
+con_mat_cart_imb <- confusionMatrix(cart_imb_test_pred, test_imb$y_test_imb)
+con_mat_cart_imb$table
+```
+
+
+## Random Forests
+
+```{r echo = FALSE, warning=FALSE, fig.width=9, fig.height=11, fig.align='center', message=FALSE}
+rf_imb <- train(y_train_imb~., 
+              data=train_imb, 
+              method='rfRules', 
+              metric='Accuracy',
+              weights=model_weights,
+              ntree=50,
+              trControl=trctrl,
+              parms = list(split = "gini"))
+
+# See results
+rf_imb
+# Accuracy and Confusion Matrix
+rf_imb_test_pred <- predict(rf_imb, newdata = test_imb)
+con_mat_rf_imb <- confusionMatrix(rf_imb_test_pred, test_imb$y_test_imb)
+con_mat_rf_imb$table
+```
+
+# Question 3.2
+## Part B
+
+
+  * This question was a little hard to understand at the beginning. Then I did understand but 
+  
+  * couldn't implement it in R. I guess Python is friendlier with this.
+  
+  <img src="funny_sad.jpg" height="380px">
+
+
