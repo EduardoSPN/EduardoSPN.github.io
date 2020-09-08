@@ -567,14 +567,4 @@ con_mat_rf_imb <- confusionMatrix(rf_imb_test_pred, test_imb$y_test_imb)
 con_mat_rf_imb$table
 ```
 
-# Question 3.2
-## Part B
-
-
-* This question was a little hard to understand at the beginning. Then I did understand but couldn't implement it in R. I guess Python is friendlier with this.
-
-<br>
-  
-  <img src="funny_sad.jpg" height="180px">
-
 
