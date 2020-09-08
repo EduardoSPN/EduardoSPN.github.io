@@ -571,10 +571,10 @@ con_mat_rf_imb$table
 ## Part B
 
 
-  * This question was a little hard to understand at the beginning. Then I did understand but 
+* This question was a little hard to understand at the beginning. Then I did understand but couldn't implement it in R. I guess Python is friendlier with this.
+
+<br>
   
-  * couldn't implement it in R. I guess Python is friendlier with this.
-  
-  <img src="funny_sad.jpg" height="380px">
+  <img src="funny_sad.jpg" height="180px">
 
 
