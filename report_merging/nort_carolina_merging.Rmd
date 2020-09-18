@@ -70,7 +70,7 @@ colnames(core_100)
 
 
 
-Dataset           |    Numb of Obs  |   NAs - InfoUSA |   NAs - Corelogic
+Dataset           |     Type        |   NAs - InfoUSA |   NAs - Corelogic
 ------------------|-----------------|-----------------|-----------------
 first_name_1      |    "character"  |   0             |     5  
 last_name_1       |    "character"  |   0             |     5
@@ -202,11 +202,11 @@ class: inverse, center, middle
 
 ### Duplicates
 
-Here there might be some discrepancies between my approach and Sarah's results. What are we really looking for here? This is what I think:
+* Here there might be some discrepancies between my approach and Sarah's results. What are we really looking for here? This is what I think:
 
-**Duplicates:** We want to check if there are instances where there are repeated matches that don't make sense. For me this would be the cases where you have the same row in Corelogic (the same property-person pair) -`this is why we need to know what unique rows mean in Corelogic` - matching the same familyid from InfoUSA more than once in the same year (we only have owner information in InfoUSA and `familyid` can only be repeated in different years) - i.e: the only variable that should allow repeated familyid in InfoUSA is year.
+* **Duplicates:** We want to check if there are instances where there are repeated matches that don't make sense. For me this would be the cases where you have the same row in Corelogic (the same property-person pair) -`this is why we need to know what unique rows mean in Corelogic` - matching the same familyid from InfoUSA more than once in the same year (we only have owner information in InfoUSA and `familyid` can only be repeated in different years) - i.e: the only variable that should allow repeated familyid in InfoUSA is year.
 
-We use this code to confirm that
+* We use this code to confirm that
 ```{r eval=FALSE}
 infousa_nc[, delete:=.GRP, by=c("year", "familyid")]
 length(unique(infousa_nc$delete))
@@ -216,7 +216,9 @@ nrow(infousa_nc)
 
 ### Duplicates
 
-With the following code we check duplicated rows grouping by the unique row indicator in Corelogic and familyid. The idea is that we should only see matches of the exact same row of Corelogic with the exact same familyid in different years. After merging, you should see the same transaction that happened in 2006 matched with the same familyid for all the years in InfoUSA (from 2006 to 2019) but never repeated in the same year.
+* With the following code we check duplicated rows grouping by the unique row indicator in Corelogic and familyid. The idea is that we should only see matches of the exact same row of Corelogic with the exact same familyid in different years. 
+
+* After merging, you should see the same transaction that happened in 2006 matched with the same familyid for all the years in InfoUSA (from 2006 to 2019) but never repeated in the same year.
 
 ```{r eval=FALSE}
 sum(duplicated(clean_3, by=c("temp_id_core", "familyid")))
@@ -228,7 +230,7 @@ print("9,222,824 duplicates")
 print("0 duplicates")
 ```
 
-If there are duplicates of the exact same row within years, then those are just repeated values that we should delete. This didn't happen in NC.
+* If there are duplicates of the exact same row within years, then those are just repeated values that we should delete. This didn't happen in NC.
 
 ---
 class: inverse, center, middle
@@ -237,15 +239,15 @@ class: inverse, center, middle
 
 ### Multiple Transactions
 
-What I understood from Sarah's code and after speaking to her, is that we want only the oldest transaction for each person. This is what I did to accomplish that:
+* What I understood from Sarah's code and after speaking to her, is that we want only the oldest transaction for each person. This is what I did to accomplish that:
 
 ```{r eval=FALSE}
 clean_3_f <- clean_3[, .SD[which(sale_date == min(sale_date))], by = .(apn_unformatted, familyid)]
 ```
 
-What the code is doing is to group by the property indicator 'apn_unformatted' and 'familyid' and only keep the observations that correspond to the oldest date (in terms of days) for each pair apn-familyid.
+* What the code is doing is to group by the property indicator 'apn_unformatted' and 'familyid' and only keep the observations that correspond to the oldest date (in terms of days) for each pair apn-familyid.
 
-Sarah's approach used first_name_1 and last_name_1 instead of familyid and used an iterative process that I didn't quite understand. Also at the end she wants to 'assign the most recent InfoUSA ID' but I don't understand the reason. I wanted to check that with you since it might be something important and I'm missing the idea.
+* Sarah's approach used first_name_1 and last_name_1 instead of familyid and used an iterative process that I didn't quite understand. Also at the end she wants to 'assign the most recent InfoUSA ID' but I don't understand the reason. I wanted to check that with you since it might be something important and I'm missing the idea.
 
 **One reason might be that she wants to see if 'familyid' is consistent across years? So she checks if the most recent 'familyid' is the same as the one in the first transaction?**
 

@@ -84,7 +84,7 @@ Variables in Corelogic:
 
 
 
-Dataset           |    Numb of Obs  |   NAs - InfoUSA |   NAs - Corelogic
+Dataset           |     Type        |   NAs - InfoUSA |   NAs - Corelogic
 ------------------|-----------------|-----------------|-----------------
 first_name_1      |    "character"  |   0             |     5  
 last_name_1       |    "character"  |   0             |     5
@@ -165,19 +165,19 @@ Here we inspect a very small random sample of both datasets
 
 ```
 ##    first_name_1 last_name_1   zip
-## 1:       DONALD     HIBBARD 27006
-## 2:         ERIC      HUNTER 27006
-## 3:         LISA   CORNATZER 27006
-## 4:      GARLAND FEARRINGTON 27006
-## 5:      JEFFREY       LYNCH 27006
-## 6:       GEORGE    MITCHELL 27006
-##    street_name house_number
-## 1:     BERMUDA         3307
-## 2:      JORDAN          131
-## 3:   BALTIMORE          797
-## 4:     CLAYBON          187
-## 5:      ANTLER          161
-## 6:     AUSTINE          129
+## 1:         RITA        LAWS 27006
+## 2:         JACK      CARTER 27006
+## 3:      CHARLES    WILLIAMS 27006
+## 4:         MARK     KIRKMAN 27006
+## 5:         DALE       DAVIS 27006
+## 6:         GARY       GROCE 27006
+##       street_name house_number
+## 1: BAILEYS CHAPEL          182
+## 2:       OLD MILL          142
+## 3:     ARMSWORTHY          328
+## 4:         CAMDEN          144
+## 5:         BURTON          245
+## 6:    VALLEY OAKS          123
 ```
 ]
 
@@ -188,20 +188,20 @@ Here we inspect a very small random sample of both datasets
 ```
 
 ```
-##          first_name_1 last_name_1   zip
-## 1: COOK OUT MACON INC             27360
-## 2:             JOHN E     HARRELL 27804
-## 3:              IRA B    CRENSHAW 27215
-## 4:          CHARLES S      HOWELL 27349
-## 5:            JAMES L   MANSFIELD 27927
-## 6:             JOHN J      WRIGHT 28104
-##    street_name house_number
-## 1:       LAURA           15
-## 2:    CARRIAGE         2082
-## 3:  NOTTINGHAM         2013
-## 4:      GARNER         3926
-## 5:      PLOVER          753
-## 6:        KITE         1065
+##    first_name_1 last_name_1   zip
+## 1:       DWAINE       MOORE 28018
+## 2:      AARON M      ROSADO 27858
+## 3:      JAMES L      TALLEY 28115
+## 4:      JAMES L   MANSFIELD 27927
+## 5:       MARY J     DAGGITT 27302
+## 6:     JEROME C      GEHRIG 27944
+##     street_name house_number
+## 1:  CHERRY LAKE          237
+## 2:         TARA         1936
+## 3:   MEADOWVIEW          106
+## 4:       PLOVER          753
+## 5: WALTER HAGEN          200
+## 6: COUNTRY CLUB          111
 ```
 ]
 
@@ -240,11 +240,11 @@ class: inverse, center, middle
 
 ### Duplicates
 
-Here there might be some discrepancies between my approach and Sarah's results. What are we really looking for here? This is what I think:
+* Here there might be some discrepancies between my approach and Sarah's results. What are we really looking for here? This is what I think:
 
-**Duplicates:** We want to check if there are instances where there are repeated matches that don't make sense. For me this would be the cases where you have the same row in Corelogic (the same property-person pair) -`this is why we need to know what unique rows mean in Corelogic` - matching the same familyid from InfoUSA more than once in the same year (we only have owner information in InfoUSA and `familyid` can only be repeated in different years) - i.e: the only variable that should allow repeated familyid in InfoUSA is year.
+* **Duplicates:** We want to check if there are instances where there are repeated matches that don't make sense. For me this would be the cases where you have the same row in Corelogic (the same property-person pair) -`this is why we need to know what unique rows mean in Corelogic` - matching the same familyid from InfoUSA more than once in the same year (we only have owner information in InfoUSA and `familyid` can only be repeated in different years) - i.e: the only variable that should allow repeated familyid in InfoUSA is year.
 
-We use this code to confirm that
+* We use this code to confirm that
 
 ```r
 infousa_nc[, delete:=.GRP, by=c("year", "familyid")]
@@ -255,7 +255,9 @@ nrow(infousa_nc)
 
 ### Duplicates
 
-With the following code we check duplicated rows grouping by the unique row indicator in Corelogic and familyid. The idea is that we should only see matches of the exact same row of Corelogic with the exact same familyid in different years. After merging, you should see the same transaction that happened in 2006 matched with the same familyid for all the years in InfoUSA (from 2006 to 2019) but never repeated in the same year.
+* With the following code we check duplicated rows grouping by the unique row indicator in Corelogic and familyid. The idea is that we should only see matches of the exact same row of Corelogic with the exact same familyid in different years. 
+
+* After merging, you should see the same transaction that happened in 2006 matched with the same familyid for all the years in InfoUSA (from 2006 to 2019) but never repeated in the same year.
 
 
 ```r
@@ -272,7 +274,7 @@ sum(duplicated(clean_3, by=c("temp_id_core", "familyid", "year")))
 ## [1] "0 duplicates"
 ```
 
-If there are duplicates of the exact same row within years, then those are just repeated values that we should delete. This didn't happen in NC.
+* If there are duplicates of the exact same row within years, then those are just repeated values that we should delete. This didn't happen in NC.
 
 ---
 class: inverse, center, middle
@@ -281,16 +283,16 @@ class: inverse, center, middle
 
 ### Multiple Transactions
 
-What I understood from Sarah's code and after speaking to her, is that we want only the oldest transaction for each person. This is what I did to accomplish that:
+* What I understood from Sarah's code and after speaking to her, is that we want only the oldest transaction for each person. This is what I did to accomplish that:
 
 
 ```r
 clean_3_f &lt;- clean_3[, .SD[which(sale_date == min(sale_date))], by = .(apn_unformatted, familyid)]
 ```
 
-What the code is doing is to group by the property indicator 'apn_unformatted' and 'familyid' and only keep the observations that correspond to the oldest date (in terms of days) for each pair apn-familyid.
+* What the code is doing is to group by the property indicator 'apn_unformatted' and 'familyid' and only keep the observations that correspond to the oldest date (in terms of days) for each pair apn-familyid.
 
-Sarah's approach used first_name_1 and last_name_1 instead of familyid and used an iterative process that I didn't quite understand. Also at the end she wants to 'assign the most recent InfoUSA ID' but I don't understand the reason. I wanted to check that with you since it might be something important and I'm missing the idea.
+* Sarah's approach used first_name_1 and last_name_1 instead of familyid and used an iterative process that I didn't quite understand. Also at the end she wants to 'assign the most recent InfoUSA ID' but I don't understand the reason. I wanted to check that with you since it might be something important and I'm missing the idea.
 
 **One reason might be that she wants to see if 'familyid' is consistent across years? So she checks if the most recent 'familyid' is the same as the one in the first transaction?**
 
