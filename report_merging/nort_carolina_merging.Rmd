@@ -313,6 +313,7 @@ class: inverse, center, middle
 
 ### Year of Birth variable
 
+**My approach:**
 ```{r eval=FALSE}
 
 # Lets see the levels of the age code
@@ -348,7 +349,7 @@ clean_3[change_bin==1, `:=` (birth_year = year - bin_min), by="familyid"]
 ---
 ### Year of Birth variable
 
-Sarah's approach:
+**Sarah's approach:**
 
 ```{r eval=FALSE}
 ### Compute year of birth ####
@@ -384,13 +385,11 @@ ans2 <- ans2[-which(ans2$min_age == 'J')] #remove the observations who still hav
 
 ### To DO
 
-  1. Understand why Sarah wanted to "assign the most recent InfoUSA ID" after keeping oldest transactions.
+  1. Double check section 8. I get different results as Sarah. Understand why Sarah wanted to "assign the most recent InfoUSA ID" after keeping oldest transactions.
   
   2. Wrap up and double check the birth year variable creation. Manage cases where there wasn't a bin change --> Average.
   
   2. **Groupings**: I'm realying on 'familyid' and Sarah is using first and last name together with apn. Also, what combinations of vars would be a unique indicator for Corelogic. It seems to be transaction-owner. Should we group by the Corelogic Row index? or similarly to Sarah, by apn and name?
-  
-  3. Double check section 8. I get different results as Sarah.
   
   4. Think about a strategy to track people moving. What else is relevant regarding this?
   

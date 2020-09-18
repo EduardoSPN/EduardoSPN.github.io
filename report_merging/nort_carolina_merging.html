@@ -165,19 +165,19 @@ Here we inspect a very small random sample of both datasets
 
 ```
 ##    first_name_1 last_name_1   zip
-## 1:       GORDON   CORNATZER 27006
-## 2:       ROBERT         LOW 27006
-## 3:         LOYD   BEAUCHAMP 27006
-## 4:       MARTHA    KIMBRELL 27006
-## 5:         JEAN      CARTER 27006
-## 6:      CHARLES    WILLIAMS 27006
-##       street_name house_number
-## 1:      BALTIMORE         1049
-## 2:            ADA          118
-## 3:      BEAUCHAMP         1276
-## 4: BAILEYS CHAPEL          394
-## 5:         CARTER          148
-## 6:     ARMSWORTHY          328
+## 1:       DONALD     HIBBARD 27006
+## 2:         ERIC      HUNTER 27006
+## 3:         LISA   CORNATZER 27006
+## 4:      GARLAND FEARRINGTON 27006
+## 5:      JEFFREY       LYNCH 27006
+## 6:       GEORGE    MITCHELL 27006
+##    street_name house_number
+## 1:     BERMUDA         3307
+## 2:      JORDAN          131
+## 3:   BALTIMORE          797
+## 4:     CLAYBON          187
+## 5:      ANTLER          161
+## 6:     AUSTINE          129
 ```
 ]
 
@@ -188,19 +188,19 @@ Here we inspect a very small random sample of both datasets
 ```
 
 ```
-##    first_name_1 last_name_1   zip
-## 1:      AARON M      ROSADO 27858
-## 2:    MILDRED W    SAUNDERS 27253
-## 3:     DWAINE J       MOORE 28018
-## 4:  ELIZABETH T  TROLLINGER 27253
-## 5:      MILDRED      EZZELL 27217
-## 6:       JOHN J      WRIGHT 28104
+##          first_name_1 last_name_1   zip
+## 1: COOK OUT MACON INC             27360
+## 2:             JOHN E     HARRELL 27804
+## 3:              IRA B    CRENSHAW 27215
+## 4:          CHARLES S      HOWELL 27349
+## 5:            JAMES L   MANSFIELD 27927
+## 6:             JOHN J      WRIGHT 28104
 ##    street_name house_number
-## 1:        TARA         1936
-## 2:       BANKS          417
-## 3: CHERRY LAKE          237
-## 4:  TROLLINGER          811
-## 5:   COURTLAND          331
+## 1:       LAURA           15
+## 2:    CARRIAGE         2082
+## 3:  NOTTINGHAM         2013
+## 4:      GARNER         3926
+## 5:      PLOVER          753
 ## 6:        KITE         1065
 ```
 ]
@@ -359,6 +359,7 @@ class: inverse, center, middle
 
 ### Year of Birth variable
 
+**My approach:**
 
 ```r
 # Lets see the levels of the age code
@@ -394,7 +395,7 @@ clean_3[change_bin==1, `:=` (birth_year = year - bin_min), by="familyid"]
 ---
 ### Year of Birth variable
 
-Sarah's approach:
+**Sarah's approach:**
 
 
 ```r
@@ -431,13 +432,11 @@ ans2 &lt;- ans2[-which(ans2$min_age == 'J')] #remove the observations who still 
 
 ### To DO
 
-  1. Understand why Sarah wanted to "assign the most recent InfoUSA ID" after keeping oldest transactions.
+  1. Double check section 8. I get different results as Sarah. Understand why Sarah wanted to "assign the most recent InfoUSA ID" after keeping oldest transactions.
   
   2. Wrap up and double check the birth year variable creation. Manage cases where there wasn't a bin change --&gt; Average.
   
   2. **Groupings**: I'm realying on 'familyid' and Sarah is using first and last name together with apn. Also, what combinations of vars would be a unique indicator for Corelogic. It seems to be transaction-owner. Should we group by the Corelogic Row index? or similarly to Sarah, by apn and name?
-  
-  3. Double check section 8. I get different results as Sarah.
   
   4. Think about a strategy to track people moving. What else is relevant regarding this?
   
