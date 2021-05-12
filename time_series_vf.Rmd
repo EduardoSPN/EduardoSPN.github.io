@@ -82,6 +82,11 @@ class: inverse, center, middle
 
 * A diferencia de la econometría de corte transversal, en el modelamiento de series de tiempo el supuesto de **no autocorrelación serial** ya no es válido. De hecho, en series de tiempo, necesitamos esta autocorrelación. Vamos a modelar la autocorrelación explícitamente.
 
+<br>
+**AR(1)**
+
+$$y_t  = \phi y_{t-1} + \epsilon_t$$
+
 ---
 ### Características especiales de las ST
 
