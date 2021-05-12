@@ -427,3 +427,11 @@ $$y_t = y_{t-1} + \epsilon_t$$
 Donde $\epsilon_t$ es ruido blanco con media zero y varianza 1.
 
 **Intución:** Una serie de tiempo no estacionaria no tiene un patrón predecible en su dinámica (por ejemplo, no fluctúa alrededor de una media constante).
+
+**Tomando Primeras Diferencias**:
+
+$$y_t - y_{t-1} = y_{t-1} - y_{t-1} + \epsilon_t$$
+
+$$\nabla y_t = \epsilon_t$$
+
+Y sabemos que $\epsilon_t$ (Ruido Blanco) es un proceso estacionario.
