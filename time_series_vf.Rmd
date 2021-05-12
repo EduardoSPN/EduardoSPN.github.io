@@ -90,6 +90,20 @@ $$y_t  = \phi y_{t-1} + \epsilon_t$$
 ---
 ### Características especiales de las ST
 
+**Crecimiento de los Créditos al Sector Privado (var% 12m)**
+
+.middle.center[
+
+<img src="grafico.jpg" height="500px" width ="680px">
+
+]
+
+
+
+
+---
+### Características especiales de las ST
+
 * Otra característica fundamental del análisis de series de tiempo es la descomposición y modelamiento de **sus componentes determinísticos** como la tendencia, componente estacional y ciclo.  
 
 * Las dinámica de las series de tiempo también es influenciada por un componente estocástico / aleatorio el cual está recogido en la perturbación. Una propiedad deseable es que la influencia del componente aleatorio se vaya disipando en el tiempo pero esto no siempre ocurre. Cuando el componente estocástico es persistente (no decae en el tiempo) se dice que la serie tiene una **tendencia estocástica** o una **raíz unitaria**.
